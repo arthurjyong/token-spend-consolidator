@@ -227,17 +227,20 @@ For the next person who wants Gemini / Grok / ChatGPT / DeepSeek:
 Valuation, consolidation, cross-device, state store, and every display surface keep working
 unchanged. That's the design paying off.
 
-## 15. Open decisions (for you to lock before building)
+## 15. Decisions (locked 2026-06-28)
 
-- **Stack.** Python core is the natural fit (matches your toolset + the ccusage/LiteLLM ecosystem),
-  with the menu bar as a SwiftBar Python plugin; native Swift only if/when you want a distributable
-  app. Decide v1 stack.
-- **Publish target** for the iOS state URL (Gist vs Worker KV vs iCloud vs S3).
-- **Vendor vs fetch** the LiteLLM pricing file (vendor + periodic refresh recommended).
-- **Accounting window** for the headline: rolling 7-day (matches the quota signal) vs calendar
-  month (matches how people think about a bill). Could show both.
-- **Default fidelity mode:** ship with the Anthropic QuotaCollector off (exact-only, ToS-clean) or
-  on (fuller estimate)? Recommend off by default, opt-in with a clear explanation.
+- **Stack — LOCKED: Python core + SwiftBar.** Python for the core (M0 already is; matches the
+  ccusage/LiteLLM ecosystem). The M1 menu bar is a SwiftBar Python plugin (a script that prints the
+  bar text). A native Swift `MenuBarExtra` app is deferred to a later polish milestone.
+- **Vendor vs fetch pricing — LOCKED: vendor + periodic refresh.** Vendor the LiteLLM file for
+  offline use, refresh on a cadence, plus an `overrides.json` for gaps.
+- **Accounting window — LOCKED: calendar month (headline) + rolling 7-day (secondary).** Month is
+  how people read a bill; the 7-day figure also lines up with the Anthropic 5h/7d quota signal added
+  in M2.
+- **Default fidelity mode — LOCKED: quota collector OFF by default, opt-in.** Ships exact-only and
+  ToS-clean; the whole-account estimate is an explicit toggle with a clear explanation (§12).
+- **Publish target for the iOS state URL — DEFERRED to M4** (Gist vs Worker KV vs iCloud vs S3); not
+  needed until the iOS widget exists. Decide when M4 starts.
 
 ## 16. Steering & docs layer (how this repo is built)
 
