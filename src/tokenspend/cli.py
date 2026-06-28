@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Iterable
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from .collectors import build_collectors
@@ -142,6 +142,9 @@ def main(argv: list[str] | None = None) -> int:
                    help=f"where to write state with --write-state (default {DEFAULT_STATE_PATH})")
     p.add_argument("--no-api", action="store_true",
                    help="skip the Anthropic API usage collector even if ANTHROPIC_ADMIN_KEY is set")
+    p.add_argument("--quota", action="store_true",
+                   help="add the opt-in whole-account ESTIMATE (ToS-grey): folds in claude.ai "
+                        "chat by reverse-calculating from your quota utilization, self-calibrated from logs")
     args = p.parse_args(argv)
 
     # Registry decides which collectors are active; the API one joins only when an
@@ -171,6 +174,8 @@ def main(argv: list[str] | None = None) -> int:
     filtered = _filtered(records, project=args.project, since=args.since, until=args.until)
     report = consolidate(filtered)
     _print_report(report, args, plan)
+    if args.quota:
+        _print_quota(records)
     _print_scan(collectors)
     return 0
 
@@ -180,6 +185,38 @@ def _print_scan(collectors) -> None:
         line = c.report_line()
         if line:
             print(line)
+
+
+def _print_quota(records) -> None:
+    """Opt-in whole-account estimate (blueprint §6/§12). Everything here is an
+    order-of-magnitude estimate via the ToS-grey quota signal — labelled as such."""
+    from .quota import estimate, fetch_usage, update_calibration
+    from .valuation import value
+
+    today = date.today()
+    lo, hi = (today - timedelta(days=6)).isoformat(), today.isoformat()
+    code_7d = sum(
+        value(r).usd for r in records
+        if r.surface == "claude-code" and lo <= (r.timestamp or "")[:10] <= hi
+    )
+
+    print("\n" + "-" * 64)
+    print("  WHOLE-ACCOUNT ESTIMATE  (rolling 7 days · opt-in · ToS-grey · rough)")
+    reading = fetch_usage()
+    if reading is None:
+        print("  unavailable — no OAuth token or cache. Open Claude Code once, then retry.")
+        return
+    rate, calibrated = update_calibration(code_7d, reading.seven_day_pct)
+    e = estimate(code_7d, reading, rate)
+    src = "live" if not reading.from_cache else f"cached ({reading.note})"
+    cal = "self-calibrated from your Code-only weeks" if calibrated else "ANCHOR (not yet calibrated — use it more to self-calibrate)"
+
+    print(f"  quota now:  5h {e['five_hour_pct']:.0f}%  ·  7d {e['seven_day_pct']:.0f}%        [reading: {src}]")
+    print(f"  rate: ~{_fmt_usd(e['dollars_per_pct'])} per 1% of weekly quota  ({cal})")
+    print(f"  → a full week at 100% ≈ {_fmt_usd(e['ceiling_week'])} of API-equivalent value")
+    print(f"  last 7 days, all Claude ≈ {_fmt_usd(e['combined_7d'])}  "
+          f"= {_fmt_usd(e['exact_code_7d'])} exact Code + ~{_fmt_usd(e['chat_7d'])} estimated chat")
+    print(f"  ≈ {_fmt_usd(e['combined_month_proj'])}/mo at this rate")
 
 
 if __name__ == "__main__":

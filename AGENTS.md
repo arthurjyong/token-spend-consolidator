@@ -15,6 +15,7 @@ Data flows **collectors → valuation → consolidate**. A new provider touches 
 - `src/tokenspend/valuation.py` — `value(record) → usd`. Provider-agnostic; imports only `model` + `pricing`.
 - `src/tokenspend/consolidate.py` — merges valued records into the headline + breakdowns; imports `model` + `valuation`.
 - `src/tokenspend/state.py` — writes the small JSON that displays read (month + rolling-7-day windows, top projects, daily series); imports `consolidate` + `valuation`.
+- `src/tokenspend/quota.py` — **OPT-IN, ToS-grey** whole-account estimate (`--quota`, off by default; blueprint §6/§12). Reads the Claude Code OAuth token (macOS Keychain `Claude Code-credentials`) → `GET /api/oauth/usage` (utilization % only, no dollars), then reverse-calculates all-Claude spend via a self-calibrated **$/%** = max(exact Code $ ÷ 7-day %) over weeks (Code-only weeks reveal the true ceiling). Cached to `~/.config/tokenspend/` — the endpoint **429s hard if polled**, so never poll. Everything it returns is an estimate.
 - `src/tokenspend/cli.py` — the `tokenspend` command; the **only** module that wires in `collectors` (via `build_collectors`).
 - `display/swiftbar/tokenspend.5m.py` — read-only menu-bar plugin. **Displays only READ the state file** (blueprint §10) — never logs, never credentials. New display surfaces (iOS) follow the same contract.
 
@@ -45,4 +46,4 @@ PYTHONPATH=src python3 tests/test_valuation.py && PYTHONPATH=src python3 tests/t
 ## Boundaries
 - **NEVER** add a third-party runtime dependency (stdlib only — flag the need, don't add it).
 - **NEVER** count usage without de-duping; **NEVER** sum `usage.iterations`; **NEVER** fold `<synthetic>` $0 rows into spend.
-- **ASK FIRST** before changing pricing/cache constants, and before enabling the ToS-grey whole-account quota collector (off by default — see BLUEPRINT §12).
+- **ASK FIRST** before changing pricing/cache constants. The ToS-grey whole-account quota estimate (`--quota`, `quota.py`) is built but **off by default** — never enable it implicitly, never poll its endpoint, keep its output labelled "estimate" (BLUEPRINT §12).

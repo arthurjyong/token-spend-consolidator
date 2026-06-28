@@ -56,6 +56,18 @@ tokenspend
 
 It reads the org's own usage report (`/v1/organizations/usage_report/messages`), so those numbers are **exact**, not estimated. API usage is disjoint from subscription Claude Code logs, so nothing is double-counted. Without the key the tool runs exactly as before (Claude Code logs only); a bad key is skipped with a note rather than failing. Use `--no-api` to skip it even when the key is set.
 
+## Whole-account estimate, incl. claude.ai chat (optional, opt-in)
+
+The exact number above is **Claude Code only**. To fold in your claude.ai web/app chat, add `--quota`:
+
+```bash
+tokenspend --quota
+```
+
+There's no API that reports chat token usage, so this **reverse-calculates** from your subscription's quota bar: it reads your Claude Code login (macOS Keychain) to fetch your whole-account utilization %, then converts % → dollars using a **"$ per %" rate self-calibrated from your own Claude-Code-only weeks** (where the % is moved entirely by usage the logs measure exactly). Then `all-Claude ≈ quota% × ($/%)`, and `chat ≈ that − exact Code`.
+
+⚠️ **This is opt-in and a grey area:** it reuses the Claude Code credential from a non-Claude-Code tool (against the letter of Anthropic's ToS), the endpoint is undocumented and rate-limited (the tool caches and never polls), and **every figure it produces is an order-of-magnitude estimate**. It's off by default; the tool stays fully exact + ToS-clean without it. The chat residual reads ~$0 until a Code-only week sets your ceiling — it self-corrects as you keep using it.
+
 ## What it shows
 
 - **Headline**: total API-equivalent dollars, always split into `exact` + `estimated`.
@@ -86,7 +98,7 @@ A new provider touches only layer 1 (+ maybe a pricing entry). See `docs/BLUEPRI
 
 ## Known limitations (be honest)
 
-- **Claude Code + Anthropic API; chat not yet.** Claude Code logs are always counted; Anthropic API usage folds in when you set `ANTHROPIC_ADMIN_KEY` (both exact). Consumer-chat usage is not yet counted — that's the upcoming opt-in quota estimator.
+- **Exact: Claude Code (always) + Anthropic API (with `ANTHROPIC_ADMIN_KEY`). Chat: opt-in estimate only.** claude.ai web/app chat has no usage API, so it's only available via the `--quota` whole-account estimate (opt-in, ToS-grey, order-of-magnitude). Without `--quota` the headline is exact and ToS-clean.
 - **Exact-only mode.** No quota/chat estimation yet — `estimated` is always $0 today. The whole-account quota estimate (blueprint §6) is deliberately deferred and will be opt-in.
 - **Pricing is vendored, not live.** The base table is LiteLLM's `model_prices_and_context_window.json` (filtered to text LLMs), refreshed with `python3 scripts/refresh_pricing.py`; `pricing/overrides.json` pins or overrides specific rates. It already prices 100+ models across providers, so adding a provider is usually zero-code — but the numbers are only as current as the last refresh (`_meta.fetched`).
 
