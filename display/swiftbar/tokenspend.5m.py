@@ -20,11 +20,30 @@
 
 import json
 import os
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
 STATE = Path(os.environ.get("TOKENSPEND_STATE", Path.home() / ".config/tokenspend/state.json"))
-CMD = os.environ.get("TOKENSPEND_CMD", "tokenspend")
+
+
+def _resolve_cmd():
+    """Find the `tokenspend` command. SwiftBar runs with a minimal GUI PATH that
+    misses pipx's ~/.local/bin, so fall back to common absolute locations."""
+    env = os.environ.get("TOKENSPEND_CMD")
+    if env:
+        return env
+    found = shutil.which("tokenspend")
+    if found:
+        return found
+    for p in (Path.home() / ".local/bin/tokenspend",
+              Path("/opt/homebrew/bin/tokenspend"), Path("/usr/local/bin/tokenspend")):
+        if p.exists():
+            return str(p)
+    return "tokenspend"
+
+
+CMD = _resolve_cmd()
 STALE_MIN = 90
 
 

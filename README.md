@@ -15,10 +15,10 @@ No dependencies — pure Python stdlib (3.10+).
 PYTHONPATH=src python3 -m tokenspend
 ```
 
-Or install the `tokenspend` command:
+Or install the `tokenspend` command (pipx keeps it isolated; works on PEP-668 / Homebrew-Python systems):
 
 ```bash
-pip install -e .
+pipx install -e .     # or: pip install -e .  (in a venv)
 tokenspend
 ```
 
@@ -39,9 +39,12 @@ For an accurate subscription comparison when your plan changed over time, drop a
 Keep the number ambient in your macOS menu bar:
 
 ```bash
-tokenspend --write-state        # writes ~/.config/tokenspend/state.json
-brew install --cask swiftbar    # then point SwiftBar at display/swiftbar/
+tokenspend --write-state                                   # writes ~/.config/tokenspend/state.json
+brew install --cask swiftbar                                # the menu-bar host
+defaults write com.ameba.SwiftBar PluginDirectory "$PWD/display/swiftbar" && open -a SwiftBar
 ```
+
+To keep the bar current automatically, run `tokenspend --write-state` on a schedule (a launchd agent or `*/10 * * * * tokenspend --write-state` in cron — no network).
 
 The plugin (`display/swiftbar/tokenspend.5m.py`) shows the **API-equivalent $ you've spent this 5-hour session** in the bar (exact Claude Code, no network). The dropdown adds **this week** and **since your subscription started**, and — when you've opted into the quota estimate — the **combined total incl. claude.ai chat** per window. By design the **display only reads the state file**; the bar never calls anything, and the one (opt-in, ToS-grey) quota call happens only when you click **"Refresh + chat estimate"**. Keep the bar fresh on a schedule (`*/15 * * * * tokenspend --write-state` — no network) and it stays decoupled, so the upcoming iOS widget is trivial.
 
