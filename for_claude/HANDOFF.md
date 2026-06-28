@@ -24,5 +24,6 @@ The hard-won invariants (de-dup key, don't-sum-`iterations`, cache TTL split, `c
 2. ✅ **Done — M2 ApiUsageCollector + registry** (see Status). The collector type and provider/surface plugin model are proven.
 3. **Methodology view** — surface per-surface coverage (`coverage_note`) + the exact/estimated split in the CLI/state, so the headline self-documents (BLUEPRINT §8). Small, no new collector.
 4. **QuotaCollector (opt-in, OFF by default).** `GET /api/oauth/usage` whole-account % → the whole-pool/residual math (BLUEPRINT §6) to fold in opaque chat usage without double-counting. ToS-grey (§12) — keep it an explicit toggle.
-5. **Cross-device + a second provider (OpenAI usage API)** to prove the abstraction end-to-end (BLUEPRINT §13 M3–M4) — should be ~one new collector module + one `registry.py` line.
-6. **iOS widget** (Scriptable or WidgetKit) reading the published state — same read-only contract as the menu bar.
+5. **iOS widget** (Scriptable or WidgetKit) reading the published state — same read-only contract as the menu bar.
+
+**Scope (2026-06-28):** Claude-only — this is Arthur's personal tool for his own (Claude) usage. **Don't build other-provider collectors** (OpenAI/Gemini; former blueprint M4) unless asked. The multi-provider extensibility (LiteLLM pricing + collector registry) stays as a free architectural property. The most relevant remaining Claude work is the opt-in claude.ai chat/quota estimator (#4), which captures his *Claude consumer* usage. Cross-device aggregation (multiple Macs, still Claude) is optional. See memory `claude-only-scope`.
