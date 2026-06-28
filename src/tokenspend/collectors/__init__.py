@@ -7,6 +7,12 @@ Four kinds exist (see docs/BLUEPRINT.md sec.5):
   ManualCollector   — user-entered figures / heuristic            <- future
 """
 
+from .anthropic_api_usage import AnthropicApiUsageCollector
 from .claude_code_log import ClaudeCodeLogCollector
+from .registry import build_collectors
 
-__all__ = ["ClaudeCodeLogCollector"]
+__all__ = [
+    "ClaudeCodeLogCollector",
+    "AnthropicApiUsageCollector",
+    "build_collectors",
+]

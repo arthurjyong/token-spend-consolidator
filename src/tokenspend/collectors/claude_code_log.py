@@ -50,12 +50,21 @@ def _token_counts(usage: dict) -> TokenCounts:
 class ClaudeCodeLogCollector:
     """Walks the Claude Code transcript tree and yields exact UsageRecords."""
 
+    name = "claude-code"
+    fidelity = "exact"
+    coverage_note = "exact, from local Claude Code logs (this device only)"
+
     def __init__(self, root: Path | str | None = None, device: str | None = None):
         self.root = Path(root) if root else DEFAULT_ROOT
         self.device = device or os.uname().nodename
         # de-dup ledger: a usage row can recur across resumed transcripts
         self._seen: set[str] = set()
         self.stats = {"files": 0, "rows": 0, "deduped": 0, "no_usage": 0}
+
+    def report_line(self) -> str:
+        s = self.stats
+        return (f"  [claude-code] scanned {s['files']:,} transcripts · "
+                f"{s['rows']:,} billed messages · {s['deduped']:,} duplicates skipped")
 
     def collect(self) -> Iterator[UsageRecord]:
         if not self.root.exists():

@@ -10,12 +10,12 @@ A small, local-first, single-user tool that answers: **"if I'd paid API rates fo
 ## Architecture — three layers, kept separate
 Data flows **collectors → valuation → consolidate**. A new provider touches only layer 1.
 - `src/tokenspend/model.py` — `UsageRecord` + `TokenCounts`: the normalized shape every collector emits. e.g. `UsageRecord(provider="anthropic", surface="claude-code", model="claude-opus-4-8", timestamp=…, tokens=TokenCounts(input=12, output=340, cache_read=9001, cache_write_5m=120, cache_write_1h=0), source_ref="<msgid>:<reqid>", project="my-app")`.
-- `src/tokenspend/collectors/` — per-source adapters; each emits `UsageRecord`s. `claude_code_log.py` is the only one built and is the **canonical template — copy it** for new collectors.
+- `src/tokenspend/collectors/` — per-source adapters; each emits `UsageRecord`s and exposes `collect()` + `name` / `coverage_note` / `report_line()`. Built: `claude_code_log.py` (LogCollector, exact, surface `claude-code`) and `anthropic_api_usage.py` (ApiUsageCollector, exact, surface `api` — the Anthropic Admin usage report). `registry.py` (`build_collectors`) decides which are active — **add a new provider/surface there**. `claude_code_log.py` is the canonical template to copy.
 - `src/tokenspend/pricing/` — `anthropic_prices.json` (vendored, LiteLLM-compatible field names) + `resolve(model)`.
 - `src/tokenspend/valuation.py` — `value(record) → usd`. Provider-agnostic; imports only `model` + `pricing`.
 - `src/tokenspend/consolidate.py` — merges valued records into the headline + breakdowns; imports `model` + `valuation`.
 - `src/tokenspend/state.py` — writes the small JSON that displays read (month + rolling-7-day windows, top projects, daily series); imports `consolidate` + `valuation`.
-- `src/tokenspend/cli.py` — the `tokenspend` command; the **only** module that wires in `collectors`.
+- `src/tokenspend/cli.py` — the `tokenspend` command; the **only** module that wires in `collectors` (via `build_collectors`).
 - `display/swiftbar/tokenspend.5m.py` — read-only menu-bar plugin. **Displays only READ the state file** (blueprint §10) — never logs, never credentials. New display surfaces (iOS) follow the same contract.
 
 **Layer rule (verifiable):** `valuation.py` and `consolidate.py` must NOT import from `collectors/`; only `cli.py` does.
@@ -28,6 +28,7 @@ Data flows **collectors → valuation → consolidate**. A new provider touches 
 - **Pricing rates live in `src/tokenspend/pricing/`** — `litellm_prices.json` is the vendored LiteLLM base (don't hand-edit; regenerate with `python3 scripts/refresh_pricing.py`); `overrides.json` overlays and **wins** (custom / not-yet-upstream / verified-pinned rates, e.g. the Anthropic models). **Never restate the per-model $ numbers in prose; they drift.** Verify Anthropic rates against the `claude-api` skill on price/model changes.
 - **Project label:** use the record's `cwd` basename (real folder name); the transcript *dir* name is a lossy path-encoding.
 - **`<synthetic>` model rows** (system messages) price to $0 and are reported as *unpriced* — never folded silently into spend.
+- **Anthropic API usage** (surface `api`) comes from the Admin usage report (`GET /v1/organizations/usage_report/messages`, grouped by model, daily buckets) and needs `ANTHROPIC_ADMIN_KEY` (`sk-ant-admin…`) in the environment. Its response fields map 1:1 to `TokenCounts` (`uncached_input_tokens`→input, `cache_creation.ephemeral_5m/1h`→cache_write_5m/1h). It's pay-as-you-go API spend, **disjoint** from subscription Claude Code logs — no double-count. No key → the app degrades to exact log-only.
 
 ## Run / test
 ```bash

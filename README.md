@@ -45,6 +45,17 @@ brew install --cask swiftbar    # then point SwiftBar at display/swiftbar/
 
 The plugin (`display/swiftbar/tokenspend.5m.py`) shows this month's API-equivalent spend in the bar, with a dropdown for the rolling 7-day total, a 14-day sparkline, and top projects. By design the **display only reads the state file** — it never touches your logs or any credential (blueprint §10), which is what makes the upcoming iOS widget trivial. Refresh the data on a schedule (e.g. `*/15 * * * * tokenspend --write-state`) or with the dropdown's "Refresh now".
 
+## Anthropic API usage (optional)
+
+If you also use the Anthropic API (pay-as-you-go, separate from a Claude Code subscription), set an Admin API key and that spend folds into the headline automatically:
+
+```bash
+export ANTHROPIC_ADMIN_KEY=sk-ant-admin...   # Console → Admin → API keys
+tokenspend
+```
+
+It reads the org's own usage report (`/v1/organizations/usage_report/messages`), so those numbers are **exact**, not estimated. API usage is disjoint from subscription Claude Code logs, so nothing is double-counted. Without the key the tool runs exactly as before (Claude Code logs only); a bad key is skipped with a note rather than failing. Use `--no-api` to skip it even when the key is set.
+
 ## What it shows
 
 - **Headline**: total API-equivalent dollars, always split into `exact` + `estimated`.
@@ -67,7 +78,7 @@ Rows that resume an earlier session are de-duplicated by `(message id, request i
 
 ## Architecture (three layers)
 
-1. **collectors/** — per-source adapters that emit a normalized `UsageRecord`. `ClaudeCodeLogCollector` is implemented; `ApiUsageCollector` / `QuotaCollector` / `ManualCollector` are the documented next adapters.
+1. **collectors/** — per-source adapters that emit a normalized `UsageRecord`, wired in `registry.py`. `ClaudeCodeLogCollector` (logs) and `AnthropicApiUsageCollector` (Admin usage API) are implemented; `QuotaCollector` / `ManualCollector` are the documented next adapters. A new provider/surface is a new collector module plus one line in the registry.
 2. **valuation** — `value(record) → usd`, provider-agnostic, driven by the pricing table.
 3. **consolidate** — merges + de-duplicates into the headline number and breakdowns.
 
@@ -75,7 +86,7 @@ A new provider touches only layer 1 (+ maybe a pricing entry). See `docs/BLUEPRI
 
 ## Known limitations (be honest)
 
-- **Claude Code only, for now.** API usage and consumer-chat are not yet counted. The headline says "Claude Code alone" so it's never oversold.
+- **Claude Code + Anthropic API; chat not yet.** Claude Code logs are always counted; Anthropic API usage folds in when you set `ANTHROPIC_ADMIN_KEY` (both exact). Consumer-chat usage is not yet counted — that's the upcoming opt-in quota estimator.
 - **Exact-only mode.** No quota/chat estimation yet — `estimated` is always $0 today. The whole-account quota estimate (blueprint §6) is deliberately deferred and will be opt-in.
 - **Pricing is vendored, not live.** The base table is LiteLLM's `model_prices_and_context_window.json` (filtered to text LLMs), refreshed with `python3 scripts/refresh_pricing.py`; `pricing/overrides.json` pins or overrides specific rates. It already prices 100+ models across providers, so adding a provider is usually zero-code — but the numbers are only as current as the last refresh (`_meta.fetched`).
 

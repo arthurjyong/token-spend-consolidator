@@ -14,7 +14,7 @@ from collections.abc import Iterable
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from .collectors import ClaudeCodeLogCollector
+from .collectors import build_collectors
 from .consolidate import Bucket, Report, consolidate
 from .model import UsageRecord
 from .plan import Plan
@@ -140,13 +140,20 @@ def main(argv: list[str] | None = None) -> int:
                    help="write the consolidated state JSON for displays (menu bar) and exit")
     p.add_argument("--state-file",
                    help=f"where to write state with --write-state (default {DEFAULT_STATE_PATH})")
+    p.add_argument("--no-api", action="store_true",
+                   help="skip the Anthropic API usage collector even if ANTHROPIC_ADMIN_KEY is set")
     args = p.parse_args(argv)
 
-    collector = ClaudeCodeLogCollector(root=args.root)
+    # Registry decides which collectors are active; the API one joins only when an
+    # Admin key is present. starting_at/ending_at scope the API window to --since/--until.
+    collectors = build_collectors(
+        root=args.root, starting_at=args.since, ending_at=args.until,
+        enable_api=not args.no_api,
+    )
+    records = [rec for c in collectors for rec in c.collect()]
 
     if args.write_state:
         # Canonical ambient view: build from ALL records (ignore display/date filters).
-        records = list(collector.collect())
         state = build_state(
             records,
             now=date.today(),
@@ -157,21 +164,22 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {path}")
         print(f"  this month ({m['label']}): {_fmt_usd(m['usd'])}   "
               f"last 7 days: {_fmt_usd(w['usd'])}")
-        s = collector.stats
-        print(f"  [scanned {s['files']:,} transcripts · {s['rows']:,} billed messages · "
-              f"{s['deduped']:,} duplicates skipped]")
+        _print_scan(collectors)
         return 0
 
     plan = _resolve_plan(args)
-    records = _filtered(collector.collect(), project=args.project,
-                        since=args.since, until=args.until)
-    report = consolidate(records)
+    filtered = _filtered(records, project=args.project, since=args.since, until=args.until)
+    report = consolidate(filtered)
     _print_report(report, args, plan)
-
-    s = collector.stats
-    print(f"  [scanned {s['files']:,} transcripts · {s['rows']:,} billed messages · "
-          f"{s['deduped']:,} duplicates skipped]")
+    _print_scan(collectors)
     return 0
+
+
+def _print_scan(collectors) -> None:
+    for c in collectors:
+        line = c.report_line()
+        if line:
+            print(line)
 
 
 if __name__ == "__main__":
