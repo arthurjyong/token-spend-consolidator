@@ -28,4 +28,19 @@ The hard-won invariants (de-dup key, don't-sum-`iterations`, cache TTL split, `c
 5. **iOS widget** (Scriptable or WidgetKit) reading the published state — same read-only contract as the menu bar.
 6. **Calibration polish** (only if it bugs you): the chat residual needs a Code-only week to set the ceiling before it shows non-zero; could seed/blend the community anchor, or weight recent samples. Low priority — it self-corrects with use.
 
+## Quota↔token calibration — findings & workbench (in progress)
+Personal inputs live in `gitignored-data/` (**never committed**): `chat-exports/<date>/` (claude.ai export → chat timestamps), `quota-csv/` (Usage-for-Claude app → Export CSV → minute-res Session%/Weekly%), `screenshots/`. Reproduce: `PYTHONPATH=src python3 scripts/calibrate_quota.py`.
+
+**Method (owner's insight):** the quota endpoint gives only %, never $. Segment the quota curve into 5h sessions; the chat-free ones (cross-referenced vs chat-export timestamps) are pure Code, so `$/% = exact Code $ ÷ session-%`. True rate = **MAX** over Code-only sessions (a session with chat looks cheaper-per-%). Apply to all sessions → `chat = total − Code`.
+
+**Findings (Max 5x era, Jun 6–28):**
+- **~0.9M tokens ≈ 1% of the 5h session (≈ $1.20)**; range 0.1–1.8M/% (model mix).
+- Owner's **5:1 rule confirmed** (today's post-reset 72%:14%): ~5% session ≈ 1% weekly → 1% weekly ≈ ~4M tok ≈ $6; full week ≈ ~450M tok ≈ $600.
+- **Combined all-Claude ≈ $2,476** (Code $1,165 + est chat ~$1,311) ≈ ~$3,500/mo; vs ~$72 paid (Max 5x) = **~34×**. Chat ≈ as big as Code.
+- **Validated:** method blind-detected today's heavy chat (the export didn't contain it) purely from the quota curve.
+
+**⚠️ TIER CAVEAT:** a % is usage÷limit. The Max 5x→20x upgrade **reset both counters Jun 28 13:06 local** and ~4× the limits, so per-% is ~4× higher on Max 20x (≈3–4M tok/% session, ≈17M/% weekly) — **UNVERIFIED** until a Code-only session on the new plan. Re-export both files after a chat-free coding stretch to recalibrate.
+
+**NEXT (owner wants):** a **$-denominated menu-bar UI** mirroring "Usage for Claude" — bar shows $ spent this 5h session; dropdown adds weekly $ + since-sub-start $ (Max 20x began ~Jun 28 13:06). Exact Code $ per window is solid now; the chat layer rides on the tier-pending calibration. See memory `claude-only-scope`.
+
 **Scope (2026-06-28):** Claude-only — this is Arthur's personal tool for his own (Claude) usage. **Don't build other-provider collectors** (OpenAI/Gemini; former blueprint M4) unless asked. The multi-provider extensibility (LiteLLM pricing + collector registry) stays as a free architectural property. The most relevant remaining Claude work is the opt-in claude.ai chat/quota estimator (#4), which captures his *Claude consumer* usage. Cross-device aggregation (multiple Macs, still Claude) is optional. See memory `claude-only-scope`.

@@ -14,3 +14,8 @@ plan.json
 # personal / machine-local steering context (not for the open-source repo)
 CLAUDE.local.md
 .claude/settings.local.json
+
+# personal calibration inputs (chat exports, quota CSVs, screenshots) — NEVER commit.
+# Everything under gitignored-data/ is yours-only; only the README documenting the layout is tracked.
+gitignored-data/*
+!gitignored-data/README.md
