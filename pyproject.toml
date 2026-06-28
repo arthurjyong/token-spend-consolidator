@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "token-spend-consolidator"
+version = "0.1.0"
+description = "Estimate what your AI usage would have cost at API rates — exact for Claude Code logs, honest about the rest."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Arthur Yong" }]
+license = { text = "MIT" }
+# Core is intentionally dependency-free (stdlib only) so it runs with no install.
+dependencies = []
+
+[project.scripts]
+tokenspend = "tokenspend.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tokenspend = ["pricing/*.json"]

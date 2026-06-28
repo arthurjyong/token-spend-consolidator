@@ -1,0 +1,39 @@
+{
+  "_meta": {
+    "note": "Vendored Anthropic pricing. Costs are USD per single token. Verified against the claude-api skill (models cached 2026-06-04) and the prompt-caching multipliers (read 0.1x input, 5m write 1.25x, 1h write 2x). Field names mirror LiteLLM's model_prices_and_context_window.json so the full LiteLLM file can be dropped in later with no code change (see docs/BLUEPRINT.md sec.7).",
+    "source": "claude-api skill (Anthropic), 2026-06-04",
+    "currency": "usd_per_token"
+  },
+  "claude-opus-4-8": {
+    "litellm_provider": "anthropic",
+    "input_cost_per_token": 5e-06,
+    "output_cost_per_token": 25e-06,
+    "cache_read_input_token_cost": 0.5e-06,
+    "cache_creation_input_token_cost": 6.25e-06,
+    "cache_creation_input_token_cost_above_1hr": 10e-06
+  },
+  "claude-sonnet-4-6": {
+    "litellm_provider": "anthropic",
+    "input_cost_per_token": 3e-06,
+    "output_cost_per_token": 15e-06,
+    "cache_read_input_token_cost": 0.3e-06,
+    "cache_creation_input_token_cost": 3.75e-06,
+    "cache_creation_input_token_cost_above_1hr": 6e-06
+  },
+  "claude-haiku-4-5": {
+    "litellm_provider": "anthropic",
+    "input_cost_per_token": 1e-06,
+    "output_cost_per_token": 5e-06,
+    "cache_read_input_token_cost": 0.1e-06,
+    "cache_creation_input_token_cost": 1.25e-06,
+    "cache_creation_input_token_cost_above_1hr": 2e-06
+  },
+  "claude-fable-5": {
+    "litellm_provider": "anthropic",
+    "input_cost_per_token": 10e-06,
+    "output_cost_per_token": 50e-06,
+    "cache_read_input_token_cost": 1e-06,
+    "cache_creation_input_token_cost": 12.5e-06,
+    "cache_creation_input_token_cost_above_1hr": 20e-06
+  }
+}
