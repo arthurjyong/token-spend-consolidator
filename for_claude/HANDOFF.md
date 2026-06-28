@@ -19,7 +19,7 @@ Ship `docs/BLUEPRINT.md` incrementally: a local-first tool that consolidates "wh
 The hard-won invariants (de-dup key, don't-sum-`iterations`, cache TTL split, `cwd` basename, `<synthetic>` rows, pricing-lives-in-JSON) are in **`AGENTS.md` → Gotchas** — read them there, not duplicated here. Also: live sessions append to logs as you work, so the headline drifts a few dollars between back-to-back runs (expected — don't chase it).
 
 ## Next step / roadmap
-1. **Vendor the real LiteLLM `model_prices_and_context_window.json`** + an `overrides.json` (field names already match, so valuation is unchanged).
+1. ✅ **Done — LiteLLM pricing vendored.** `pricing/litellm_prices.json` (LiteLLM, filtered to text LLMs, 2376 models) refreshed via `scripts/refresh_pricing.py`; `pricing/overrides.json` overlays/pins (Anthropic models verified vs claude-api). Non-Anthropic models now price with no code change.
 2. **M2 — ApiUsageCollector** for the Anthropic Admin usage/cost API — proves the second collector type and the plugin model.
 3. **QuotaCollector (opt-in, OFF by default).** `GET /api/oauth/usage` whole-account % → the whole-pool/residual math (BLUEPRINT §6) to fold in opaque chat usage without double-counting. ToS-grey (§12) — keep it an explicit toggle.
 4. **Cross-device + a second provider (OpenAI)** to prove the abstraction (BLUEPRINT §13 M3–M4).

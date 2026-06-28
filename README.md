@@ -53,7 +53,7 @@ The plugin (`display/swiftbar/tokenspend.5m.py`) shows this month's API-equivale
 
 ## How the money math works
 
-Every billed assistant message in the logs carries `input`, `output`, `cache_read`, and `cache_creation` tokens (the last split into 5-minute and 1-hour cache writes). Each is multiplied by its rate from the vendored pricing table (`src/tokenspend/pricing/anthropic_prices.json`):
+Every billed assistant message in the logs carries `input`, `output`, `cache_read`, and `cache_creation` tokens (the last split into 5-minute and 1-hour cache writes). Each is multiplied by its rate from the vendored pricing table (`src/tokenspend/pricing/litellm_prices.json`, with `overrides.json` taking precedence):
 
 | Token type | Rate (× input) |
 |---|---|
@@ -77,7 +77,7 @@ A new provider touches only layer 1 (+ maybe a pricing entry). See `docs/BLUEPRI
 
 - **Claude Code only, for now.** API usage and consumer-chat are not yet counted. The headline says "Claude Code alone" so it's never oversold.
 - **Exact-only mode.** No quota/chat estimation yet — `estimated` is always $0 today. The whole-account quota estimate (blueprint §6) is deliberately deferred and will be opt-in.
-- **Pricing is vendored, not live.** Numbers are current as of the file's `_meta.source` date; field names mirror LiteLLM's `model_prices_and_context_window.json` so the full multi-provider file can be dropped in later.
+- **Pricing is vendored, not live.** The base table is LiteLLM's `model_prices_and_context_window.json` (filtered to text LLMs), refreshed with `python3 scripts/refresh_pricing.py`; `pricing/overrides.json` pins or overrides specific rates. It already prices 100+ models across providers, so adding a provider is usually zero-code — but the numbers are only as current as the last refresh (`_meta.fetched`).
 
 ## Roadmap
 

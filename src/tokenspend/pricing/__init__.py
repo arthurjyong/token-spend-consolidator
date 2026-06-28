@@ -1,8 +1,10 @@
 """Pricing table: load the vendored rates and resolve a raw model id to an entry.
 
-Provider-agnostic by construction. Today it loads Anthropic rates; dropping in
-LiteLLM's model_prices_and_context_window.json (same field names) extends it to
-OpenAI / Gemini / xAI / DeepSeek with no code change.
+Provider-agnostic by construction. The base table is LiteLLM's vendored
+model_prices_and_context_window.json (filtered to text LLMs — see
+scripts/refresh_pricing.py), which prices OpenAI / Gemini / xAI / DeepSeek /
+Anthropic and 100+ others with no code change. overrides.json overlays on top
+and always wins (custom, not-yet-upstream, or verified-and-pinned rates).
 """
 
 from __future__ import annotations
@@ -12,17 +14,25 @@ from functools import lru_cache
 from pathlib import Path
 
 _PRICES_DIR = Path(__file__).resolve().parent
+_OVERRIDES_FILE = "overrides.json"
+_SKIP_KEYS = {"sample_spec"}  # LiteLLM's documentation template, not a model
+
+
+def _load_into(table: dict[str, dict], path: Path) -> None:
+    for key, entry in json.loads(path.read_text()).items():
+        if key.startswith("_") or key in _SKIP_KEYS or not isinstance(entry, dict):
+            continue
+        table[key] = entry
 
 
 @lru_cache(maxsize=1)
 def _table() -> dict[str, dict]:
     table: dict[str, dict] = {}
-    for jf in sorted(_PRICES_DIR.glob("*.json")):
-        data = json.loads(jf.read_text())
-        for key, entry in data.items():
-            if key.startswith("_"):  # skip _meta and friends
-                continue
-            table[key] = entry
+    for jf in sorted(p for p in _PRICES_DIR.glob("*.json") if p.name != _OVERRIDES_FILE):
+        _load_into(table, jf)
+    overrides = _PRICES_DIR / _OVERRIDES_FILE
+    if overrides.exists():
+        _load_into(table, overrides)  # overrides always win
     return table
 
 

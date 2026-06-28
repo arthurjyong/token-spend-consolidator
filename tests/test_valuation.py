@@ -45,6 +45,21 @@ def test_opus_output_dominates():
     assert abs(v.usd - 25.0) < 1e-9
 
 
+def test_litellm_breadth_prices_other_providers():
+    # vendoring the LiteLLM table means non-Anthropic models price with no code change
+    for m in ("gpt-4o", "gemini-2.5-pro", "deepseek-chat"):
+        key, entry = resolve(m)
+        assert entry is not None and entry.get("input_cost_per_token", 0) > 0, m
+
+
+def test_anthropic_overrides_pin_verified_rates():
+    # overrides.json wins over the vendored base and pins the verified rates
+    key, entry = resolve("claude-opus-4-8")
+    assert key == "claude-opus-4-8"
+    assert entry["input_cost_per_token"] == 5e-6 and entry["output_cost_per_token"] == 25e-6
+    assert entry["cache_read_input_token_cost"] == 0.5e-6  # 0.1x input
+
+
 def _run():
     fns = [g for n, g in sorted(globals().items()) if n.startswith("test_")]
     for fn in fns:

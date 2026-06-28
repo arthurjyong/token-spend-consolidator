@@ -25,7 +25,7 @@ Data flows **collectors → valuation → consolidate**. A new provider touches 
 - **NEVER sum `usage.iterations`** — it's a per-turn breakdown of the same totals and double-counts. Sum the top-level `message.usage`.
 - **Always de-dup on `(message.id, requestId)`** before valuing — resumed sessions re-copy earlier rows (~11k of ~19k in testing).
 - **Cache pricing:** cache read = 0.1× input, 5m write = 1.25×, 1h write = 2×. These multipliers are *fallbacks* in `valuation.py`, used only when a pricing entry omits explicit cache rates.
-- **Pricing rates live in `src/tokenspend/pricing/anthropic_prices.json`** (LiteLLM field names) — **never restate the per-model $ numbers in prose; they drift.** `pricing/*.json` is vendored upstream data: don't hand-edit; refresh by re-import.
+- **Pricing rates live in `src/tokenspend/pricing/`** — `litellm_prices.json` is the vendored LiteLLM base (don't hand-edit; regenerate with `python3 scripts/refresh_pricing.py`); `overrides.json` overlays and **wins** (custom / not-yet-upstream / verified-pinned rates, e.g. the Anthropic models). **Never restate the per-model $ numbers in prose; they drift.** Verify Anthropic rates against the `claude-api` skill on price/model changes.
 - **Project label:** use the record's `cwd` basename (real folder name); the transcript *dir* name is a lossy path-encoding.
 - **`<synthetic>` model rows** (system messages) price to $0 and are reported as *unpriced* — never folded silently into spend.
 

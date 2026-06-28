@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "note": "Vendored Anthropic pricing. Costs are USD per single token. Verified against the claude-api skill (models cached 2026-06-04) and the prompt-caching multipliers (read 0.1x input, 5m write 1.25x, 1h write 2x). Field names mirror LiteLLM's model_prices_and_context_window.json so the full LiteLLM file can be dropped in later with no code change (see docs/BLUEPRINT.md sec.7).",
-    "source": "claude-api skill (Anthropic), 2026-06-04",
+    "note": "Hand-maintained rate overrides. These WIN over the vendored litellm_prices.json. Use for models not yet upstream, custom rates, or pinned-and-verified rates. Costs are USD per single token; field names mirror LiteLLM.",
+    "anthropic_pins": "The Anthropic entries below are pinned to rates verified against the claude-api skill (2026-06-04: read 0.1x input, 5m write 1.25x, 1h write 2x). They currently match LiteLLM upstream exactly; kept as a verified pin against an upstream regression. Re-verify against the claude-api skill on Anthropic price changes or new model releases, and update or remove as needed.",
     "currency": "usd_per_token"
   },
   "claude-opus-4-8": {
