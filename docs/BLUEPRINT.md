@@ -238,3 +238,21 @@ unchanged. That's the design paying off.
   month (matches how people think about a bill). Could show both.
 - **Default fidelity mode:** ship with the Anthropic QuotaCollector off (exact-only, ToS-clean) or
   on (fuller estimate)? Recommend off by default, opt-in with a clear explanation.
+
+## 16. Steering & docs layer (how this repo is built)
+
+This project is built and maintained almost entirely by AI coding agents, so the steering files are
+the primary control surface — treat them like code. **One canonical source per topic, no duplication:**
+
+- `AGENTS.md` — tool-agnostic orientation: architecture, hard-won gotchas, run/test, boundaries (any agent).
+- `CLAUDE.md` — Claude-Code-specific notes; imports `AGENTS.md`.
+- `for_claude/HANDOFF.md` — cross-session bridge (what's built + history); may be stale.
+- `docs/BLUEPRINT.md` (this file) — the locked product spec; read before any milestone.
+- `CLAUDE.local.md` (gitignored) — personal/owner context.
+
+**Precedence on conflict:** this blueprint wins on design intent; `AGENTS.md`/`CLAUDE.md` win on how the
+code runs today; `HANDOFF` defers to both. Pricing rates live only in `pricing/anthropic_prices.json`,
+never restated in prose. A committed `Stop` hook runs the stdlib tests as a deterministic backstop.
+
+The practices behind this split — and what was deliberately rejected as overhead for a tool this small —
+are documented in `docs/research/steering-practices.md`.

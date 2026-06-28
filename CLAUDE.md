@@ -1,36 +1,30 @@
-# CLAUDE.md — token-spend-consolidator
+<!-- Maintainers: this file is injected in full into EVERY Claude Code session. Keep it lean (target <150 lines incl. the @AGENTS.md import) and high-signal. Prune test: if removing a line wouldn't cause an agent to make a mistake, cut it. Orientation/architecture/gotchas → AGENTS.md; spec → docs/BLUEPRINT.md; history → for_claude/HANDOFF.md (all load separately). Treat steering edits like code: commit them with the behaviour they document, and resolve any contradiction to a single source in the same pass — the commit is the review. -->
+@AGENTS.md
 
-Orientation for any Claude session working in this project. Read this first.
+# CLAUDE.md — Claude Code specifics
 
-## What this is
-A small, local-first tool that answers: **"if I'd paid API rates for everything I actually used, what would it have cost?"** Claude-only today, designed to extend to other providers. Full design intent is in `docs/BLUEPRINT.md` (the hard decisions are already made there — treat it as the spec).
+`AGENTS.md` (imported above) is the shared orientation: what this is, the architecture, the gotchas, run/test, boundaries. Below is **only** what's specific to Claude Code.
 
-## ⚠️ Path-keyed memory
-This project was scaffolded and given its working M0 from a *different* Claude session (the Work-files hub, `…/Work`). Claude Code memory lives at `~/.claude/projects/<encoded-abs-path>/`, so that build history is recorded under the hub, not here. **Run Claude Code from inside this folder** so this project accrues its own memory going forward. `for_claude/HANDOFF.md` bridges the gap — read it for what was built and why.
+## ⚠️ Path-keyed memory — run from this folder
+Claude Code memory lives at `~/.claude/projects/<encoded-abs-path>/`. M0 was built from a *different* session (the Work-files hub, `…/Work`), so that history is recorded under the hub, not here. **Run Claude Code from inside this folder** so the project accrues its own memory. `for_claude/HANDOFF.md` bridges the gap — **read it first** for what's built, what's next, and why.
 
-## Architecture (three layers — keep them separate)
-- `src/tokenspend/model.py` — `UsageRecord` + `TokenCounts` (the normalized shape every collector emits).
-- `src/tokenspend/collectors/` — per-source adapters. `claude_code_log.py` is the only one implemented. New providers/surfaces are new collectors here and (almost) nothing else.
-- `src/tokenspend/pricing/` — `anthropic_prices.json` (vendored, LiteLLM-compatible field names) + `resolve(model)`.
-- `src/tokenspend/valuation.py` — `value(record) → usd`. Provider-agnostic; knows nothing about sources.
-- `src/tokenspend/consolidate.py` — merges valued records into the headline + breakdowns.
-- `src/tokenspend/cli.py` — the `tokenspend` command.
+## Pricing & models
+Before touching pricing or model facts, verify rates against the **`claude-api` skill** (current model ids, $/1M, cache multipliers). The actual numbers live in `pricing/anthropic_prices.json`, not in prose (see AGENTS.md → Gotchas) — don't restate them here.
 
-## Key facts learned the hard way
-- **Claude Code log schema**: each `*.jsonl` line is a record; billed turns are `type=="assistant"` with `message.usage`. Usage keys: `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, and crucially `cache_creation: {ephemeral_5m_input_tokens, ephemeral_1h_input_tokens}` — the TTL split that makes pricing exact. There's also a `usage.iterations` array: **do not sum it**, it's a per-turn breakdown of the same totals (double-counts).
-- **De-dup is mandatory**: resuming a session copies earlier messages into the new transcript. Key on `(message.id, requestId)`. In testing this skipped ~11k duplicate rows out of ~19k.
-- **Project label**: prefer the record's `cwd` basename (real folder name); the transcript *dir* name is a lossy path-encoding.
-- **Pricing/caching** (per token, verified against the `claude-api` skill): cache read = 0.1× input, 5m write = 1.25×, 1h write = 2×. Opus 4.x $5/$25 per 1M, Sonnet 4.6 $3/$15, Haiku 4.5 $1/$5, Fable 5 $10/$50.
-- `<synthetic>` model rows exist (system messages) — they price to $0 and are reported as unpriced, not silently counted.
+## Doc map & precedence
+Four committed files, **one canonical source per topic — don't duplicate:**
+- `AGENTS.md` — orientation, architecture, gotchas, commands (any agent).
+- `CLAUDE.md` (this file) — Claude-Code-specific notes.
+- `for_claude/HANDOFF.md` — cross-session bridge: what's built + history. May be stale; lowest precedence.
+- `docs/BLUEPRINT.md` — the locked product spec; read before any new milestone.
 
-## Run / test
-```bash
-PYTHONPATH=src python3 -m tokenspend --plan-monthly 200
-PYTHONPATH=src python3 -m pytest -q        # or: python3 tests/test_valuation.py
-```
+On conflict: **BLUEPRINT** wins on design intent; **AGENTS.md/CLAUDE.md** win on how the code runs today; **HANDOFF** defers to both. Pricing rates → `pricing/anthropic_prices.json`, never restated in prose.
 
-## Owner context
-Arthur is on **Claude Max** and barely touches the quota — so the interesting story is how far the API-equivalent number exceeds the subscription. Don't gate token spend anxiously. Prefers clear, glanceable output over billing-grade precision.
+## Working style here
+- **Stay small.** This is deliberately tiny and dependency-free. Add an abstraction when the *second* provider actually lands, not before; don't reach for a library to save a few lines of stdlib.
+- For **multi-layer / new-provider work** (touches `collectors/` + invariants + `consolidate` + tests), write a short plan to `docs/plans/<slug>.md` first — memory is path-keyed and sessions compact, so the plan file is what survives. Skip the plan for one-liners (bump a price, add a model id).
+- Use the bundled **`/code-review`** on diffs touching the de-dup key or pricing multipliers; ask it for correctness gaps only, not style.
+- Personal/owner context (subscription, machine-specific flags) lives in gitignored `CLAUDE.local.md`, not here.
 
 ## Next steps
-See `for_claude/HANDOFF.md` → Roadmap. Short version: M1 menu-bar display, vendor the full LiteLLM pricing file, Anthropic usage API collector, then the opt-in whole-account quota estimator (blueprint §6).
+See `for_claude/HANDOFF.md` → roadmap: M1 menu-bar display, vendor the full LiteLLM pricing file, Anthropic usage API collector, then the opt-in whole-account quota estimator (BLUEPRINT §6).
