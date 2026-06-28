@@ -11,10 +11,30 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Iterable
+from datetime import date
+from pathlib import Path
 
 from .collectors import ClaudeCodeLogCollector
 from .consolidate import Bucket, Report, consolidate
 from .model import UsageRecord
+from .plan import Plan
+
+# Where to look for a saved subscription history when none is given on the CLI.
+_PLAN_SEARCH = (
+    Path("plan.json"),
+    Path.home() / ".config" / "tokenspend" / "plan.json",
+)
+
+
+def _resolve_plan(args) -> Plan | None:
+    if args.plan_monthly is not None:
+        return Plan.flat(args.plan_monthly)
+    if args.plan_file:
+        return Plan.load(args.plan_file)
+    for p in _PLAN_SEARCH:
+        if p.exists():
+            return Plan.load(p)
+    return None
 
 
 def _fmt_usd(x: float) -> str:
@@ -55,7 +75,7 @@ def _print_bucket_table(title: str, buckets: dict[str, Bucket], total: float, to
         print(f"  {'… ' + str(len(rows) - top) + ' more':<{width}}  {_fmt_usd(rest):>12}")
 
 
-def _print_report(r: Report, args) -> None:
+def _print_report(r: Report, args, plan: Plan | None) -> None:
     print("=" * 64)
     print("  Token Spend — API-equivalent cost of your Claude Code usage")
     print("=" * 64)
@@ -83,25 +103,22 @@ def _print_report(r: Report, args) -> None:
             print(f"  {month}  {_fmt_usd(b.usd):>12}  {_fmt_tokens(b.tokens):>9} tok  "
                   f"({b.records:,} msgs)")
 
-    if args.plan_monthly and r.first_ts and r.last_ts:
-        months = _months_between(r.first_ts[:7], r.last_ts[:7])
-        sub_total = args.plan_monthly * months
+    if plan is not None and r.first_ts and r.last_ts:
+        start = date.fromisoformat(r.first_ts[:10])
+        end = date.fromisoformat(r.last_ts[:10])
+        paid, runs = plan.amount_paid(start, end)
         print("\n" + "-" * 64)
-        print(f"  vs subscription: {_fmt_usd(args.plan_monthly)}/mo × {months} month(s) "
-              f"= {_fmt_usd(sub_total)} paid")
-        if sub_total > 0:
-            ratio = r.total_usd / sub_total
+        print(f"  vs subscription actually paid ({start} → {end}, pro-rated daily):")
+        for run in runs:
+            print(f"    {run.name:<22} {run.days:>3} day(s)  = {_fmt_usd(run.subtotal):>9}")
+        print(f"  total paid ≈ {_fmt_usd(paid)}")
+        if paid > 0:
+            ratio = r.total_usd / paid
             verdict = "you came out AHEAD" if ratio > 1 else "the subscription cost more"
-            print(f"  API-equivalent / subscription = {ratio:.2f}×  →  {verdict}")
-            print(f"  (Claude Code alone; chat usage not yet counted — see --help)")
+            print(f"  API-equivalent / subscription = {ratio:.1f}×  →  {verdict}")
+            print("  (Claude Code alone; chat usage not yet counted)")
 
     print()
-
-
-def _months_between(start_ym: str, end_ym: str) -> int:
-    sy, sm = (int(x) for x in start_ym.split("-"))
-    ey, em = (int(x) for x in end_ym.split("-"))
-    return (ey - sy) * 12 + (em - sm) + 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -113,15 +130,19 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--project", help="only projects whose label contains this substring")
     p.add_argument("--since", help="only usage on/after this date (YYYY-MM-DD)")
     p.add_argument("--until", help="only usage on/before this date (YYYY-MM-DD)")
+    p.add_argument("--plan-file",
+                   help="JSON file with your subscription history (see plan.example.json); "
+                        "auto-detected from ./plan.json or ~/.config/tokenspend/plan.json")
     p.add_argument("--plan-monthly", type=float,
-                   help="monthly subscription fee to compare against (e.g. 200 for Max 20x)")
+                   help="shorthand: a single flat monthly fee (overrides --plan-file)")
     args = p.parse_args(argv)
 
+    plan = _resolve_plan(args)
     collector = ClaudeCodeLogCollector(root=args.root)
     records = _filtered(collector.collect(), project=args.project,
                         since=args.since, until=args.until)
     report = consolidate(records)
-    _print_report(report, args)
+    _print_report(report, args, plan)
 
     s = collector.stats
     print(f"  [scanned {s['files']:,} transcripts · {s['rows']:,} billed messages · "

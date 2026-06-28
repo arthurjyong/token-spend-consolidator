@@ -37,5 +37,5 @@ These match expectations: heavy Opus use on my-app, and the Max subscription is 
 - Use `cwd` basename for project labels.
 - Live sessions append to logs as you work, so the headline drifts a few dollars between back-to-back runs — expected.
 
-## Open question for Arthur
-Which subscription tier to hard-code as the default comparison (Max 20x = $200/mo? Max 5x = $100?). Currently passed via `--plan-monthly`; default could be set once confirmed.
+## Resolved: subscription comparison is plan-history aware
+Arthur's plan changed over the usage window, so a flat fee was wrong. Built `plan.py` (time-varying segments, pro-rated daily = monthly×12/365) + a `plan.json` config (auto-detected from `./plan.json` or `~/.config/tokenspend/plan.json`; `plan.example.json` is the committed template; the real `plan.json` is gitignored). Arthur's actual history: Pro $20/mo until 6 Jun → Max 5x $100/mo → Max 20x $200/mo (bought 28 Jun). Accurate result: ~$1,143 API-equivalent vs **$84 actually paid** over the window = **~13.6× ahead** (not the 2.8× the flat-$200 guess gave). Bare `tokenspend` now shows this.

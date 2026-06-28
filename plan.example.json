@@ -1,0 +1,8 @@
+{
+  "_note": "Copy to plan.json and edit. Each segment's 'from' date is when that monthly fee took effect; it applies until the next segment. The earliest segment also covers everything before its date. Fees are pro-rated by day (monthly x 12 / 365) over your usage window for the subscription comparison. 'label' is optional.",
+  "segments": [
+    { "from": "2000-01-01", "monthly": 20,  "label": "Pro" },
+    { "from": "2026-06-06", "monthly": 100, "label": "Max 5x" },
+    { "from": "2026-06-28", "monthly": 200, "label": "Max 20x" }
+  ]
+}

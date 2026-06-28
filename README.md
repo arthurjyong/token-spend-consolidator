@@ -29,8 +29,10 @@ tokenspend                      # headline + by-model + by-project + by-month
 tokenspend --by month           # just the monthly trend
 tokenspend --project my-app   # filter to one project
 tokenspend --since 2026-06-01   # date window
-tokenspend --plan-monthly 200   # compare against a $200/mo subscription (e.g. Max 20x)
+tokenspend --plan-monthly 200   # quick: compare against a flat $200/mo
 ```
+
+For an accurate subscription comparison when your plan changed over time, drop a `plan.json` next to the tool (or at `~/.config/tokenspend/plan.json`) — see `plan.example.json`. It lists each fee and the date it took effect; the tool pro-rates the active fee day-by-day across your usage window. `tokenspend` picks it up automatically.
 
 ## What it shows
 
