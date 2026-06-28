@@ -7,7 +7,8 @@ Ship `docs/BLUEPRINT.md` incrementally: a local-first tool that consolidates "wh
 
 ## Status (2026-06-28)
 - ✅ **Built (M0 + plan-history comparison):** `model.py`, `pricing/` (vendored Anthropic, LiteLLM-shaped) + `resolve`, `valuation.py`, `collectors/claude_code_log.py`, `consolidate.py`, `plan.py`, `cli.py`; tests `test_valuation.py`, `test_plan.py`. Runs: `PYTHONPATH=src python3 -m tokenspend`.
-- ⛔ **Not built:** any second collector, the state file, the menu-bar/iOS display, the quota estimator.
+- ✅ **Built (M1 — Glance):** `state.py` writes `~/.config/tokenspend/state.json` (month + rolling-7-day windows, top projects, 30-day daily series; atomic write) via `tokenspend --write-state`; `display/swiftbar/tokenspend.5m.py` is a read-only menu-bar plugin (month headline, 7-day, sparkline, top projects, staleness, Refresh-now). Test `test_state.py`. Decoupling per BLUEPRINT §10: the display only reads the file.
+- ⛔ **Not built:** any second collector, the iOS widget, cross-device aggregation, the quota estimator.
 - **First real run** (Arthur's logs, 2026-05-29 → 2026-06-28): ~$1,143 API-equivalent, 1.01B tokens, ~7,900 billed messages, ~11k duplicate rows correctly skipped. Opus 4.8 ≈ 86% of spend; biggest project my-app (~$635). vs ~$84 actually paid over the window = **~13.6× ahead** (Claude Code alone; chat not yet counted).
 
 ## Decisions + why
@@ -18,8 +19,8 @@ Ship `docs/BLUEPRINT.md` incrementally: a local-first tool that consolidates "wh
 The hard-won invariants (de-dup key, don't-sum-`iterations`, cache TTL split, `cwd` basename, `<synthetic>` rows, pricing-lives-in-JSON) are in **`AGENTS.md` → Gotchas** — read them there, not duplicated here. Also: live sessions append to logs as you work, so the headline drifts a few dollars between back-to-back runs (expected — don't chase it).
 
 ## Next step / roadmap
-1. **M1 — Glance.** Write a small state JSON + a SwiftBar/xbar plugin that prints the headline; the display only reads the file (BLUEPRINT §10–11).
-2. **Vendor the real LiteLLM `model_prices_and_context_window.json`** + an `overrides.json` (field names already match, so valuation is unchanged).
-3. **ApiUsageCollector** for the Anthropic Admin usage/cost API — proves the second collector type and the plugin model.
-4. **QuotaCollector (opt-in, OFF by default).** `GET /api/oauth/usage` whole-account % → the whole-pool/residual math (BLUEPRINT §6) to fold in opaque chat usage without double-counting. ToS-grey (§12) — keep it an explicit toggle.
-5. **Cross-device + a second provider (OpenAI)** to prove the abstraction (BLUEPRINT §13 M3–M4).
+1. **Vendor the real LiteLLM `model_prices_and_context_window.json`** + an `overrides.json` (field names already match, so valuation is unchanged).
+2. **M2 — ApiUsageCollector** for the Anthropic Admin usage/cost API — proves the second collector type and the plugin model.
+3. **QuotaCollector (opt-in, OFF by default).** `GET /api/oauth/usage` whole-account % → the whole-pool/residual math (BLUEPRINT §6) to fold in opaque chat usage without double-counting. ToS-grey (§12) — keep it an explicit toggle.
+4. **Cross-device + a second provider (OpenAI)** to prove the abstraction (BLUEPRINT §13 M3–M4).
+5. **iOS widget** (Scriptable or WidgetKit) reading the published state — same read-only contract as the menu bar.

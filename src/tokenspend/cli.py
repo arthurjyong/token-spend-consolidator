@@ -11,13 +11,14 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Iterable
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from .collectors import ClaudeCodeLogCollector
 from .consolidate import Bucket, Report, consolidate
 from .model import UsageRecord
 from .plan import Plan
+from .state import DEFAULT_STATE_PATH, build_state, write_state
 
 # Where to look for a saved subscription history when none is given on the CLI.
 _PLAN_SEARCH = (
@@ -135,10 +136,33 @@ def main(argv: list[str] | None = None) -> int:
                         "auto-detected from ./plan.json or ~/.config/tokenspend/plan.json")
     p.add_argument("--plan-monthly", type=float,
                    help="shorthand: a single flat monthly fee (overrides --plan-file)")
+    p.add_argument("--write-state", action="store_true",
+                   help="write the consolidated state JSON for displays (menu bar) and exit")
+    p.add_argument("--state-file",
+                   help=f"where to write state with --write-state (default {DEFAULT_STATE_PATH})")
     args = p.parse_args(argv)
 
-    plan = _resolve_plan(args)
     collector = ClaudeCodeLogCollector(root=args.root)
+
+    if args.write_state:
+        # Canonical ambient view: build from ALL records (ignore display/date filters).
+        records = list(collector.collect())
+        state = build_state(
+            records,
+            now=date.today(),
+            generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        )
+        path = write_state(state, args.state_file or DEFAULT_STATE_PATH)
+        m, w = state["month"], state["week"]
+        print(f"wrote {path}")
+        print(f"  this month ({m['label']}): {_fmt_usd(m['usd'])}   "
+              f"last 7 days: {_fmt_usd(w['usd'])}")
+        s = collector.stats
+        print(f"  [scanned {s['files']:,} transcripts · {s['rows']:,} billed messages · "
+              f"{s['deduped']:,} duplicates skipped]")
+        return 0
+
+    plan = _resolve_plan(args)
     records = _filtered(collector.collect(), project=args.project,
                         since=args.since, until=args.until)
     report = consolidate(records)

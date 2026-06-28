@@ -34,6 +34,17 @@ tokenspend --plan-monthly 200   # quick: compare against a flat $200/mo
 
 For an accurate subscription comparison when your plan changed over time, drop a `plan.json` next to the tool (or at `~/.config/tokenspend/plan.json`) — see `plan.example.json`. It lists each fee and the date it took effect; the tool pro-rates the active fee day-by-day across your usage window. `tokenspend` picks it up automatically.
 
+## Menu bar (glance)
+
+Keep the number ambient in your macOS menu bar:
+
+```bash
+tokenspend --write-state        # writes ~/.config/tokenspend/state.json
+brew install --cask swiftbar    # then point SwiftBar at display/swiftbar/
+```
+
+The plugin (`display/swiftbar/tokenspend.5m.py`) shows this month's API-equivalent spend in the bar, with a dropdown for the rolling 7-day total, a 14-day sparkline, and top projects. By design the **display only reads the state file** — it never touches your logs or any credential (blueprint §10), which is what makes the upcoming iOS widget trivial. Refresh the data on a schedule (e.g. `*/15 * * * * tokenspend --write-state`) or with the dropdown's "Refresh now".
+
 ## What it shows
 
 - **Headline**: total API-equivalent dollars, always split into `exact` + `estimated`.
@@ -70,6 +81,6 @@ A new provider touches only layer 1 (+ maybe a pricing entry). See `docs/BLUEPRI
 
 ## Roadmap
 
-See `for_claude/HANDOFF.md` for current state and next steps (menu-bar display, LiteLLM vendoring, Anthropic usage API, the opt-in quota estimator).
+See `for_claude/HANDOFF.md` for current state and next steps (LiteLLM vendoring, Anthropic usage API, the opt-in quota estimator, iOS widget). The menu-bar glance (M1) ships above.
 
 MIT licensed. Single-user, local-first.

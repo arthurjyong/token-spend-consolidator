@@ -14,7 +14,9 @@ Data flows **collectors → valuation → consolidate**. A new provider touches 
 - `src/tokenspend/pricing/` — `anthropic_prices.json` (vendored, LiteLLM-compatible field names) + `resolve(model)`.
 - `src/tokenspend/valuation.py` — `value(record) → usd`. Provider-agnostic; imports only `model` + `pricing`.
 - `src/tokenspend/consolidate.py` — merges valued records into the headline + breakdowns; imports `model` + `valuation`.
+- `src/tokenspend/state.py` — writes the small JSON that displays read (month + rolling-7-day windows, top projects, daily series); imports `consolidate` + `valuation`.
 - `src/tokenspend/cli.py` — the `tokenspend` command; the **only** module that wires in `collectors`.
+- `display/swiftbar/tokenspend.5m.py` — read-only menu-bar plugin. **Displays only READ the state file** (blueprint §10) — never logs, never credentials. New display surfaces (iOS) follow the same contract.
 
 **Layer rule (verifiable):** `valuation.py` and `consolidate.py` must NOT import from `collectors/`; only `cli.py` does.
 
@@ -31,6 +33,7 @@ Data flows **collectors → valuation → consolidate**. A new provider touches 
 ```bash
 PYTHONPATH=src python3 -m tokenspend             # headline + breakdowns over all local logs
 PYTHONPATH=src python3 -m tokenspend --by month  # one breakdown; also --project / --since / --until / --plan-monthly N
+PYTHONPATH=src python3 -m tokenspend --write-state  # refresh ~/.config/tokenspend/state.json for the menu bar
 ```
 Tests are **stdlib-only (no pytest)**. Run both and read the output — don't assume success:
 ```bash
