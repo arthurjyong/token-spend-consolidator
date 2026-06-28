@@ -35,8 +35,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+from tokenspend import quota  # noqa: E402
 from tokenspend.collectors import ClaudeCodeLogCollector  # noqa: E402
+from tokenspend.plan import Plan  # noqa: E402
 from tokenspend.valuation import value  # noqa: E402
+
+
+def _load_plan():
+    for p in (ROOT / "plan.json", Path.home() / ".config" / "tokenspend" / "plan.json"):
+        if p.exists():
+            return Plan.load(p)
+    return None
 
 P = lambda s: datetime.fromisoformat(s.replace("Z", "+00:00"))
 
@@ -80,6 +89,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--csv", default=_default_csv(), help="quota usage CSV (default: latest in gitignored-data/quota-csv/)")
     ap.add_argument("--chat-export", default=_default_chat(), help="conversations.json (default: latest in gitignored-data/chat-exports/)")
+    ap.add_argument("--save", action="store_true",
+                    help="save session/weekly $/% rates to window_calibration.json for the menu bar")
     a = ap.parse_args()
     if not a.csv or not a.chat_export:
         print("Missing inputs. Put a quota CSV in gitignored-data/quota-csv/ and a chat export in "
@@ -145,6 +156,19 @@ def main() -> int:
         c, ch, comb = apply(rate)
         print(f"  [{lab} ${rate:.2f}/%]  Code ${c:,.0f} + est chat ${ch:,.0f} = ${comb:,.0f}  (~${comb/days*30:,.0f}/mo)")
     print("\nCaveats: order-of-magnitude (per-% varies with model mix); tier-specific (see upgrade above).")
+
+    if a.save:
+        plan = _load_plan()
+        mid_date = cal[len(cal) // 2][2].date()  # representative calibration date
+        seg = plan.segment_on(mid_date) if plan else None
+        tier_label = seg.label if seg else None
+        tier_mult = quota.tier_multiplier(tier_label)
+        session_rate = med
+        week_rate = med * 5  # owner's measured 5:1 session:weekly ratio
+        path = quota.save_window_calibration(session_rate, week_rate, tier_mult, tier_label)
+        print(f"\nSaved window calibration -> {path}")
+        print(f"  session ${session_rate:.2f}/%  ·  weekly ${week_rate:.2f}/%  ·  tier {tier_label} (×{tier_mult:.0f})")
+        print("  the menu bar tier-scales these to your current plan; recalibrate on Max 20x for accuracy.")
     return 0
 
 

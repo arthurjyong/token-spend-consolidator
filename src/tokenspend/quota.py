@@ -37,6 +37,7 @@ OAUTH_BETA = "oauth-2025-04-20"
 _CONFIG_DIR = Path.home() / ".config" / "tokenspend"
 CACHE_PATH = _CONFIG_DIR / "quota_cache.json"
 CALIB_PATH = _CONFIG_DIR / "quota_calibration.json"
+WINDOW_CALIB_PATH = _CONFIG_DIR / "window_calibration.json"  # written by scripts/calibrate_quota.py --save
 CACHE_TTL_MIN = 10  # the endpoint rate-limits hard; never call more often than this
 
 # Bootstrap "$ per %" until your own Code-only weeks calibrate it. ~ $1,400/week at
@@ -91,6 +92,61 @@ def parse_reading(raw: dict) -> tuple[float, float]:
     fh = ((raw.get("five_hour") or {}).get("utilization")) or 0.0
     sd = ((raw.get("seven_day") or {}).get("utilization")) or 0.0
     return float(fh), float(sd)
+
+
+def load_cached_raw(cache_path: Path = CACHE_PATH) -> dict | None:
+    """The last raw quota payload (no network) — has utilization + resets_at per window."""
+    c = _load(cache_path)
+    return c.get("raw") if c else None
+
+
+def reading_resets_at(raw: dict | None, key: str):
+    """resets_at datetime for 'five_hour'/'seven_day' from a raw payload, or None."""
+    s = ((raw or {}).get(key) or {}).get("resets_at")
+    try:
+        t = datetime.fromisoformat(s) if s else None
+    except (ValueError, TypeError):
+        return None
+    return t.replace(tzinfo=timezone.utc) if (t and t.tzinfo is None) else t
+
+
+def reading_utilization(raw: dict | None, key: str) -> float:
+    return float(((raw or {}).get(key) or {}).get("utilization") or 0.0)
+
+
+# ---- window calibration ($/session-% and $/weekly-%, tier-aware) ------------
+
+def tier_multiplier(label: str | None) -> float:
+    """5 from 'Max 5x', 20 from 'Max 20x', 1 otherwise — quota limits scale with this."""
+    import re
+    m = re.search(r"(\d+)\s*x", (label or "").lower())
+    return float(m.group(1)) if m else 1.0
+
+
+def save_window_calibration(session_rate, week_rate, tier_mult, tier_label,
+                            calib_path: Path = WINDOW_CALIB_PATH) -> Path:
+    _save(calib_path, {
+        "session_rate": round(session_rate, 4), "week_rate": round(week_rate, 4),
+        "tier_mult": tier_mult, "tier_label": tier_label,
+        "calibrated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    })
+    return calib_path
+
+
+def window_rates(current_tier_label: str | None, calib_path: Path = WINDOW_CALIB_PATH):
+    """(session_rate, week_rate, note) scaled from the saved calibration to the
+    current plan tier (a % is usage÷limit, so rate scales with the tier multiplier),
+    or (None, None, note) if not calibrated yet."""
+    c = _load(calib_path)
+    if not c or not c.get("session_rate"):
+        return None, None, "not calibrated (run scripts/calibrate_quota.py --save)"
+    cal_mult = float(c.get("tier_mult") or 1.0)
+    cur_mult = tier_multiplier(current_tier_label)
+    scale = (cur_mult / cal_mult) if cal_mult else 1.0
+    note = f"calibrated on {c.get('tier_label', '?')}"
+    if abs(scale - 1.0) > 1e-9:
+        note += f" · ×{scale:.1f} to {current_tier_label} (estimate — recalibrate on the new tier)"
+    return round(c["session_rate"] * scale, 4), round(c["week_rate"] * scale, 4), note
 
 
 # ---- tiny json helpers ------------------------------------------------------

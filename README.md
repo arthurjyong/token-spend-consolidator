@@ -43,7 +43,7 @@ tokenspend --write-state        # writes ~/.config/tokenspend/state.json
 brew install --cask swiftbar    # then point SwiftBar at display/swiftbar/
 ```
 
-The plugin (`display/swiftbar/tokenspend.5m.py`) shows this month's API-equivalent spend in the bar, with a dropdown for the rolling 7-day total, a 14-day sparkline, and top projects. By design the **display only reads the state file** — it never touches your logs or any credential (blueprint §10), which is what makes the upcoming iOS widget trivial. Refresh the data on a schedule (e.g. `*/15 * * * * tokenspend --write-state`) or with the dropdown's "Refresh now".
+The plugin (`display/swiftbar/tokenspend.5m.py`) shows the **API-equivalent $ you've spent this 5-hour session** in the bar (exact Claude Code, no network). The dropdown adds **this week** and **since your subscription started**, and — when you've opted into the quota estimate — the **combined total incl. claude.ai chat** per window. By design the **display only reads the state file**; the bar never calls anything, and the one (opt-in, ToS-grey) quota call happens only when you click **"Refresh + chat estimate"**. Keep the bar fresh on a schedule (`*/15 * * * * tokenspend --write-state` — no network) and it stays decoupled, so the upcoming iOS widget is trivial.
 
 ## Anthropic API usage (optional)
 

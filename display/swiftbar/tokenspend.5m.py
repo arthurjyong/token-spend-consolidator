@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 # <xbar.title>Token Spend</xbar.title>
-# <xbar.version>1.0</xbar.version>
+# <xbar.version>2.0</xbar.version>
 # <xbar.author>Arthur Yong</xbar.author>
-# <xbar.desc>API-equivalent cost of your AI usage, glanceable in the menu bar.</xbar.desc>
+# <xbar.desc>API-equivalent $ spent this Claude session/week/since-subscription, in the menu bar.</xbar.desc>
 # <xbar.dependencies>python3</xbar.dependencies>
 #
-# SwiftBar/xbar plugin. It ONLY reads the state file the collector writes
-# (blueprint sec.10) — it never touches Claude logs or any credential, which is
-# what keeps it portable (the iOS widget will read the same shape).
+# SwiftBar/xbar plugin. Reads ONLY the state file the collector writes — it never
+# touches your logs or any credential (blueprint sec.10).
 #
-# Setup:
-#   1. brew install --cask swiftbar   (then point SwiftBar at this folder)
-#   2. Refresh the data periodically so the number stays fresh, e.g. a cron line:
-#        */15 * * * * tokenspend --write-state
-#      (or use the "Refresh now" item in the dropdown). The filename's `.5m.`
-#      only controls how often the bar re-RENDERS the file, not data collection.
+# Bar (always visible, NO network): exact Claude Code $ spent this 5-hour session.
+# Dropdown: the same per window PLUS the combined estimate incl. claude.ai chat,
+# which rides on the cached quota reading. "Refresh + chat estimate" makes the one
+# (ToS-grey) quota call on demand — nothing polls it automatically.
 #
-# Env overrides:
-#   TOKENSPEND_STATE        path to state.json (default ~/.config/tokenspend/state.json)
-#   TOKENSPEND_REFRESH_CMD  command the "Refresh now" item runs (default: tokenspend --write-state)
+# Setup: brew install --cask swiftbar; point SwiftBar at this folder. Keep the bar
+# fresh with a cron line: */15 * * * * tokenspend --write-state   (no network).
+#
+# Env: TOKENSPEND_STATE (state.json path) · TOKENSPEND_CMD (default "tokenspend")
 
 import json
 import os
@@ -26,55 +24,65 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 STATE = Path(os.environ.get("TOKENSPEND_STATE", Path.home() / ".config/tokenspend/state.json"))
-REFRESH_CMD = os.environ.get("TOKENSPEND_REFRESH_CMD", "tokenspend --write-state")
-STALE_MIN = 90  # flag the readout if the data is older than this many minutes
-
-BLOCKS = "▁▂▃▄▅▆▇█"
+CMD = os.environ.get("TOKENSPEND_CMD", "tokenspend")
+STALE_MIN = 90
 
 
-def money(x: float) -> str:
+def money(x):
     return f"${x:,.0f}"
 
 
-def parse_dt(iso: str):
+def parse_dt(iso):
     try:
-        t = datetime.fromisoformat(iso)
+        t = datetime.fromisoformat((iso or "").replace("Z", "+00:00"))
     except (ValueError, TypeError):
         return None
-    return t.replace(tzinfo=timezone.utc) if t.tzinfo is None else t
+    return t.replace(tzinfo=timezone.utc) if (t and t.tzinfo is None) else t
 
 
-def ago(secs: float) -> str:
-    if secs < 90:
-        return "just now"
-    if secs < 3600:
-        return f"{int(secs // 60)}m ago"
-    if secs < 86400:
-        return f"{int(secs // 3600)}h ago"
-    return f"{int(secs // 86400)}d ago"
-
-
-def sparkline(values) -> str:
-    vals = [v for v in values if v is not None]
-    if not vals:
+def clock(iso):
+    t = parse_dt(iso)
+    if not t:
         return ""
-    lo, hi = min(vals), max(vals)
-    if hi <= lo:
-        return BLOCKS[0] * len(vals)
-    return "".join(BLOCKS[int((v - lo) / (hi - lo) * (len(BLOCKS) - 1))] for v in vals)
+    return t.astimezone().strftime("%-I:%M %p")
 
 
-def refresh_item(label="Refresh now"):
-    print(f'{label} | shell=/bin/sh param0=-c param1="{REFRESH_CMD}" terminal=false refresh=true')
+def ago(iso):
+    t = parse_dt(iso)
+    if not t:
+        return "?"
+    s = (datetime.now(timezone.utc) - t).total_seconds()
+    if s < 90:
+        return "just now"
+    if s < 3600:
+        return f"{int(s//60)}m ago"
+    if s < 86400:
+        return f"{int(s//3600)}h ago"
+    return f"{int(s//86400)}d ago"
 
 
-def main() -> None:
+def action(label, cmd, **kw):
+    extra = " ".join(f"{k}={v}" for k, v in kw.items())
+    print(f'{label} | shell=/bin/sh param0=-c param1="{cmd}" terminal=false refresh=true {extra}')
+
+
+def win_line(label, w, reset_iso=None):
+    """One window row: exact Code $, plus '+~chat = ~combined' if present."""
+    code = w.get("code", 0)
+    txt = f"{label}:  {money(code)} Code"
+    if "combined" in w and w.get("chat", 0) >= 1:
+        txt += f"  +~{money(w['chat'])} chat = ~{money(w['combined'])}"
+    if reset_iso:
+        txt += f"   · resets {clock(reset_iso)}"
+    print(f"{txt} | font=Menlo")
+
+
+def main():
     if not STATE.exists():
         print("💸 —")
         print("---")
-        print("No state file yet | color=gray")
-        print(f"Run:  {REFRESH_CMD} | font=Menlo size=12")
-        refresh_item("Write it now")
+        print("No state yet | color=gray")
+        action(f"Write it now ({CMD} --write-state)", f"{CMD} --write-state")
         return
 
     try:
@@ -83,48 +91,38 @@ def main() -> None:
         print("💸 ⚠️")
         print("---")
         print(f"Can't read {STATE} | color=red size=12")
-        refresh_item()
         return
 
-    m = data.get("month", {})
-    w = data.get("week", {})
-    life = data.get("lifetime", {})
+    win = data.get("windows") or {}
+    meta = win.get("_meta") or {}
+    sess = win.get("session") or {}
+    week = win.get("week") or {}
+    sub = win.get("since_sub") or {}
 
-    dt = parse_dt(data.get("generated_at", ""))
-    secs_old = (datetime.now(timezone.utc) - dt).total_seconds() if dt else None
-    stale = secs_old is not None and secs_old > STALE_MIN * 60
+    # Bar: exact Code $ this session (no network).
+    print(f"💸 {money(sess.get('code', 0))}")
+    print("---")
+    tier = f"  [{meta.get('tier')}]" if meta.get("tier") else ""
+    print(f"Token Spend — API-equivalent{tier} | size=12 color=gray")
 
-    title = f"💸 {money(m.get('usd', 0))}"
-    if stale or dt is None:
-        title += " ⚠️"
-    print(title)
+    win_line("This session (5h)", sess, meta.get("session_resets"))
+    win_line("This week", week, meta.get("week_resets"))
+    if sub:
+        sl = sub.get("label", "since subscription")
+        print(f"Since {sl}:  {money(sub.get('code', 0))} Code | font=Menlo")
 
     print("---")
-    print("Token Spend — API-equivalent | size=12 color=gray")
-    print(f"This month ({m.get('label', '?')}):  {money(m.get('usd', 0))} | font=Menlo")
-    print(f"Last 7 days:  {money(w.get('usd', 0))} | font=Menlo")
-    if life.get("first"):
-        print(f"Lifetime:  {money(life.get('usd', 0))}  "
-              f"({life['first']} → {life.get('last')}) | font=Menlo size=12")
+    if "combined" in sess:
+        print(f"exact = Claude Code logs · chat = quota estimate | size=12 color=gray")
+        print(f"calibration: {meta.get('calibration', '?')} | size=12 color=gray")
+    else:
+        print("chat estimate off — click below to fetch quota | size=12 color=gray")
+    q = meta.get("quota", "none")
+    print(f"quota reading: {q} | size=12 color=gray")
+    print(f"updated {ago(data.get('generated_at'))} | size=12 color=gray")
 
-    spark = sparkline([d.get("usd", 0) for d in data.get("daily", [])][-14:])
-    if spark:
-        print(f"Last 14 days  {spark} | font=Menlo size=12 color=gray")
-
-    tops = m.get("top_projects", [])
-    if tops:
-        print("---")
-        print("Top projects this month | size=12 color=gray")
-        for tp in tops:
-            print(f"{tp.get('project', '?')}   {money(tp.get('usd', 0))} | font=Menlo")
-
-    print("---")
-    note = data.get("fidelity_note")
-    if note:
-        print(f"{note} | size=12 color=gray")
-    updated = ago(secs_old) if secs_old is not None else "unknown time"
-    print(f"updated {updated} | size=12 color={'red' if stale else 'gray'}")
-    refresh_item()
+    action("↻ Refresh + chat estimate (fetches quota)", f"{CMD} --write-state --quota")
+    action("↻ Refresh exact only (no network)", f"{CMD} --write-state")
     print(f"Open state file | href=file://{STATE}")
 
 

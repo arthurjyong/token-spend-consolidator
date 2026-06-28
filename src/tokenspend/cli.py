@@ -18,7 +18,7 @@ from .collectors import build_collectors
 from .consolidate import Bucket, Report, consolidate
 from .model import UsageRecord
 from .plan import Plan
-from .state import DEFAULT_STATE_PATH, build_state, write_state
+from .state import DEFAULT_STATE_PATH, build_state, build_windows, write_state
 
 # Where to look for a saved subscription history when none is given on the CLI.
 _PLAN_SEARCH = (
@@ -162,6 +162,7 @@ def main(argv: list[str] | None = None) -> int:
             now=date.today(),
             generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         )
+        state["windows"] = _windows_for_state(records, args)
         path = write_state(state, args.state_file or DEFAULT_STATE_PATH)
         m, w = state["month"], state["week"]
         print(f"wrote {path}")
@@ -185,6 +186,66 @@ def _print_scan(collectors) -> None:
         line = c.report_line()
         if line:
             print(line)
+
+
+def _last_monday_10am(now: datetime) -> datetime:
+    """Fallback weekly-window start when no cached quota reset is available."""
+    local = now.astimezone()
+    monday = (local - timedelta(days=local.weekday())).replace(
+        hour=10, minute=0, second=0, microsecond=0)
+    if monday > local:
+        monday -= timedelta(days=7)
+    return monday.astimezone(timezone.utc)
+
+
+def _windows_for_state(records, args) -> dict:
+    """Session / weekly / since-subscription windows for the menu bar. Exact Code $
+    needs no network; the combined (chat) layer uses the CACHED quota reading unless
+    --quota is set (then one live fetch). Boundaries come from the quota reset times."""
+    from datetime import time as _time
+
+    from . import quota
+
+    plan = _resolve_plan(args)
+    today = date.today()
+    if plan is not None:
+        seg = plan.segment_on(today)
+        tier_label = seg.label
+        sub_label = f"{seg.label or 'subscription'} ({seg.start})"
+        sub_start_date = seg.start
+    else:
+        tier_label, sub_label, sub_start_date = None, "subscription", today
+
+    quota_note = ""
+    if args.quota:
+        rd = quota.fetch_usage()  # one live call; updates the cache
+        quota_note = (rd.note or "live") if rd else "unavailable"
+    raw = quota.load_cached_raw()
+
+    now = datetime.now(timezone.utc)
+    sess_reset = quota.reading_resets_at(raw, "five_hour")
+    week_reset = quota.reading_resets_at(raw, "seven_day")
+    session_start = (sess_reset - timedelta(hours=5)) if sess_reset else (now - timedelta(hours=5))
+    week_start = (week_reset - timedelta(days=7)) if week_reset else _last_monday_10am(now)
+    sub_start = datetime.combine(sub_start_date, _time.min).astimezone(timezone.utc)
+
+    s_rate, w_rate, cal_note = quota.window_rates(tier_label)
+    win = build_windows(
+        records, now=now, session_start=session_start, week_start=week_start,
+        sub_start=sub_start, sub_label=sub_label,
+        session_pct=quota.reading_utilization(raw, "five_hour"),
+        week_pct=quota.reading_utilization(raw, "seven_day"),
+        session_rate=s_rate, week_rate=w_rate,
+    )
+    win["_meta"] = {
+        "tier": tier_label,
+        "calibration": cal_note,
+        "session_resets": sess_reset.isoformat() if sess_reset else None,
+        "week_resets": week_reset.isoformat() if week_reset else None,
+        "quota": quota_note or ("cached" if raw else "none"),
+        "has_quota": raw is not None,
+    }
+    return win
 
 
 def _print_quota(records) -> None:

@@ -86,6 +86,35 @@ def test_write_state_roundtrips_atomically():
         assert loaded["schema"] == SCHEMA and loaded["month"]["label"] == "2026-06"
 
 
+def test_build_windows_exact_and_combined():
+    from datetime import datetime, timedelta, timezone
+    from tokenspend.state import build_windows
+    now = datetime(2026, 6, 28, 17, 0, 0, tzinfo=timezone.utc)
+
+    def rec(dt, out=1_000_000, model="claude-opus-4-8", surface="claude-code"):
+        return UsageRecord(provider="anthropic", surface=surface, model=model,
+                           timestamp=dt.isoformat().replace("+00:00", "Z"),
+                           tokens=TokenCounts(output=out), fidelity="exact", source_ref="x")
+
+    recs = [
+        rec(now - timedelta(hours=1)),                               # $25, in session
+        rec(now - timedelta(minutes=30), model="claude-sonnet-4-6"),  # $15, in session
+        rec(now - timedelta(days=2)),                                # $25, in week not session
+        rec(now - timedelta(hours=1), surface="api"),                # excluded (not claude-code)
+    ]
+    w = build_windows(recs, now=now,
+                      session_start=now - timedelta(hours=5),
+                      week_start=now - timedelta(days=7),
+                      sub_start=now - timedelta(hours=4), sub_label="Max 20x",
+                      session_pct=10.0, week_pct=2.0, session_rate=5.0, week_rate=40.0)
+    assert abs(w["session"]["code"] - 40.0) < 1e-9, w["session"]   # $25+$15, api excluded
+    assert abs(w["week"]["code"] - 65.0) < 1e-9                     # + $25 two days ago
+    assert abs(w["since_sub"]["code"] - 40.0) < 1e-9               # last 4h
+    assert w["session"]["combined"] == 50.0 and w["session"]["chat"] == 10.0  # 10% * $5
+    assert w["week"]["combined"] == 80.0 and abs(w["week"]["chat"] - 15.0) < 1e-9  # 2% * $40
+    assert "combined" not in w["since_sub"]                         # exact only
+
+
 def _run():
     fns = [g for n, g in sorted(globals().items()) if n.startswith("test_")]
     for fn in fns:

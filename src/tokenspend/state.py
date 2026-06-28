@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from .consolidate import Report, consolidate
@@ -101,6 +101,54 @@ def build_state(
             **_summary(allr),
         },
         "daily": _daily_series(recs, end=now, days=history_days),
+    }
+
+
+def _parse_iso(s: str | None):
+    try:
+        t = datetime.fromisoformat((s or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+
+
+def build_windows(
+    records: Iterable[UsageRecord],
+    *,
+    now: datetime,
+    session_start: datetime,
+    week_start: datetime,
+    sub_start: datetime,
+    sub_label: str,
+    session_pct: float = 0.0,
+    week_pct: float = 0.0,
+    session_rate: float | None = None,
+    week_rate: float | None = None,
+) -> dict:
+    """Exact Claude Code $ for the session / weekly / since-subscription windows,
+    plus an optional combined (Code + reverse-calc chat) when a quota % and a
+    calibrated $/% rate are supplied. Pure — the CLI feeds it the boundaries
+    (from the cached quota reading) and the calibration. See quota.py / blueprint §6."""
+    code = [(dt, value(r).usd) for r in records
+            if r.surface == "claude-code" and (dt := _parse_iso(r.timestamp)) is not None]
+
+    def code_since(start: datetime) -> float:
+        return round(sum(u for dt, u in code if start <= dt <= now), 2)
+
+    def combined(code_usd: float, pct: float, rate: float | None) -> dict:
+        if not rate or pct <= 0:
+            return {}
+        total = max(code_usd, round(pct * rate, 2))
+        return {"combined": round(total, 2), "chat": round(max(0.0, total - code_usd), 2)}
+
+    cs, cw = code_since(session_start), code_since(week_start)
+    return {
+        "session": {"code": cs, "since": session_start.isoformat(),
+                    "pct": session_pct, **combined(cs, session_pct, session_rate)},
+        "week": {"code": cw, "since": week_start.isoformat(),
+                 "pct": week_pct, **combined(cw, week_pct, week_rate)},
+        "since_sub": {"code": code_since(sub_start), "since": sub_start.isoformat(),
+                      "label": sub_label},
     }
 
 
