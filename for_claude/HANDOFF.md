@@ -5,7 +5,7 @@ Cross-session bridge. Claude Code memory is path-keyed; open a fresh session **f
 ## Goal
 A tiny, local-first, **Claude-only** tool answering "what would my AI usage have cost at API rates?" — for Arthur's personal reference (so the $200/mo Max sub *feels* justified). Exact where possible, honestly estimated where not. Architecture stays provider-agnostic but **don't build other providers** (see memory `claude-only-scope`).
 
-## What's built (committed on `main` through 0f2a10a; ⚠️ the Jul 4 session's work — tier-aware `scripts/calibrate_quota.py`, `quota.py` note fix, polished SwiftBar plugin, this file, `docs/plans/recalibrate-max20x.md` — is in the working tree, NOT yet committed)
+## What's built (all committed on `main`, pushed to github.com/arthurjyong/token-spend-consolidator — public, created Jul 4; history verified clean of personal data before publishing)
 - **M0 core** — `model.py`, `valuation.py`, `collectors/claude_code_log.py`, `consolidate.py`, `plan.py`, `cli.py`. `tokenspend` prints API-equivalent Code spend vs your plan-history-aware subscription.
 - **Pricing** — `pricing/litellm_prices.json` (vendored LiteLLM, 2376 text models; refresh `scripts/refresh_pricing.py`) + `pricing/overrides.json` (Anthropic models pinned, verified vs `claude-api` skill). `resolve()` overlays overrides on the base.
 - **Collectors + registry** — `collectors/registry.py::build_collectors` is the single wiring point. `claude_code_log` (surface `claude-code`, exact) + `anthropic_api_usage` (surface `api`, Admin usage report, needs `ANTHROPIC_ADMIN_KEY`, off if absent). Disjoint surfaces → no double-count.
