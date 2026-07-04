@@ -2,7 +2,7 @@
 
   tokenspend                      # headline + breakdowns over all local logs
   tokenspend --by month           # focus one breakdown
-  tokenspend --project my-app   # filter to projects whose label contains this
+  tokenspend --project my-app     # filter to projects whose label contains this
   tokenspend --since 2026-06-01   # only usage on/after this date
   tokenspend --plan-monthly 200   # compare against a $200/mo subscription
 """

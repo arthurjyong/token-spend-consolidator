@@ -27,7 +27,7 @@ tokenspend
 ```bash
 tokenspend                      # headline + by-model + by-project + by-month
 tokenspend --by month           # just the monthly trend
-tokenspend --project my-app   # filter to one project
+tokenspend --project my-app     # filter to one project
 tokenspend --since 2026-06-01   # date window
 tokenspend --plan-monthly 200   # quick: compare against a flat $200/mo
 ```
@@ -102,11 +102,11 @@ A new provider touches only layer 1 (+ maybe a pricing entry). See `docs/BLUEPRI
 ## Known limitations (be honest)
 
 - **Exact: Claude Code (always) + Anthropic API (with `ANTHROPIC_ADMIN_KEY`). Chat: opt-in estimate only.** claude.ai web/app chat has no usage API, so it's only available via the `--quota` whole-account estimate (opt-in, ToS-grey, order-of-magnitude). Without `--quota` the headline is exact and ToS-clean.
-- **Exact-only mode.** No quota/chat estimation yet — `estimated` is always $0 today. The whole-account quota estimate (blueprint §6) is deliberately deferred and will be opt-in.
+- **The chat estimate is tier- and mix-sensitive.** The self-calibrated $/% rate is measured on your own plan tier from Code-only windows; a plan change or a big shift in model mix means recalibrating (`scripts/calibrate_quota.py --save`).
 - **Pricing is vendored, not live.** The base table is LiteLLM's `model_prices_and_context_window.json` (filtered to text LLMs), refreshed with `python3 scripts/refresh_pricing.py`; `pricing/overrides.json` pins or overrides specific rates. It already prices 100+ models across providers, so adding a provider is usually zero-code — but the numbers are only as current as the last refresh (`_meta.fetched`).
 
 ## Roadmap
 
-See `for_claude/HANDOFF.md` for current state and next steps (LiteLLM vendoring, Anthropic usage API, the opt-in quota estimator, iOS widget). The menu-bar glance (M1) ships above.
+See `for_claude/HANDOFF.md` for current state and next steps (calibration refinements, a native SwiftUI menu-bar app, iOS widget). The menu-bar glance ships above.
 
 MIT licensed. Single-user, local-first.
