@@ -145,7 +145,7 @@ def window_rates(current_tier_label: str | None, calib_path: Path = WINDOW_CALIB
     scale = (cur_mult / cal_mult) if cal_mult else 1.0
     note = f"calibrated on {c.get('tier_label', '?')}"
     if abs(scale - 1.0) > 1e-9:
-        note += f" · ×{scale:.1f} to {current_tier_label} (estimate — recalibrate on the new tier)"
+        note += f" · ×{scale:g} to {current_tier_label or 'unknown plan'} (estimate — recalibrate on the new tier)"
     return round(c["session_rate"] * scale, 4), round(c["week_rate"] * scale, 4), note
 
 

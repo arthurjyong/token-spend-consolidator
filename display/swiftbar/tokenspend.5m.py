@@ -66,6 +66,26 @@ def clock(iso):
     return t.astimezone().strftime("%-I:%M %p")
 
 
+def day_clock(iso):
+    t = parse_dt(iso)
+    if not t:
+        return ""
+    return t.astimezone().strftime("%a %-I:%M %p")
+
+
+GRAY = "#6e6e73,#98989d"      # light,dark — SwiftBar picks per appearance
+ACCENT = "#d96c47,#e8825a"    # progress-bar salmon
+INK = "#1d1d1f,#ffffff"       # $ values: non-clickable rows render "disabled"-dim without an explicit color
+
+
+def bar(pct, width=20):
+    """Unicode progress bar for a 0–100 quota % (None -> no bar)."""
+    if pct is None:
+        return None
+    filled = max(0, min(width, round(pct * width / 100)))
+    return "▓" * filled + "░" * (width - filled) + f"  {pct:.0f}%"
+
+
 def ago(iso):
     t = parse_dt(iso)
     if not t:
@@ -85,15 +105,26 @@ def action(label, cmd, **kw):
     print(f'{label} | shell=/bin/sh param0=-c param1="{cmd}" terminal=false refresh=true {extra}')
 
 
-def win_line(label, w, reset_iso=None):
-    """One window row: exact Code $, plus '+~chat = ~combined' if present."""
-    code = w.get("code", 0)
-    txt = f"{label}:  {money(code)} Code"
-    if "combined" in w and w.get("chat", 0) >= 1:
-        txt += f"  +~{money(w['chat'])} chat = ~{money(w['combined'])}"
-    if reset_iso:
-        txt += f"   · resets {clock(reset_iso)}"
-    print(f"{txt} | font=Menlo")
+def gap():
+    print(" | size=3 trim=false")
+
+
+def section(title, w, reset_txt=None):
+    """One window block: small-caps header, bold $ line, optional quota bar."""
+    hdr = title.upper()
+    if reset_txt:
+        hdr += f"   ·  resets {reset_txt}"
+    print(f"{hdr} | size=11 color={GRAY} trim=false")
+    val = f"  {money(w.get('code', 0))} Code"
+    if "combined" in w:
+        if w.get("chat", 0) >= 1:
+            val += f"   +~{money(w['chat'])} chat  =  ~{money(w['combined'])}"
+        else:
+            val += "   ·  chat ≈ $0"
+    print(f"{val} | font=Menlo-Bold size=14 color={INK} trim=false")
+    b = bar(w.get("pct"))
+    if b:
+        print(f"  {b} | font=Menlo size=12 color={ACCENT} trim=false")
 
 
 def main():
@@ -121,28 +152,37 @@ def main():
     # Bar: exact Code $ this session (no network).
     print(f"💸 {money(sess.get('code', 0))}")
     print("---")
-    tier = f"  [{meta.get('tier')}]" if meta.get("tier") else ""
-    print(f"Token Spend — API-equivalent{tier} | size=12 color=gray")
+    tier = f"   [{meta.get('tier')}]" if meta.get("tier") else ""
+    print(f"Token Spend — API-equivalent{tier} | size=12 color={GRAY}")
 
-    win_line("This session (5h)", sess, meta.get("session_resets"))
-    win_line("This week", week, meta.get("week_resets"))
+    gap()
+    section("Session (5h)", sess, clock(meta.get("session_resets")))
+    gap()
+    section("Week", week, day_clock(meta.get("week_resets")))
+    gap()
     if sub:
-        sl = sub.get("label", "since subscription")
-        print(f"Since {sl}:  {money(sub.get('code', 0))} Code | font=Menlo")
+        sl = sub.get("label", "subscription")
+        section(f"Since {sl}", sub)
+    gap()
 
     print("---")
     if "combined" in sess:
-        print(f"exact = Claude Code logs · chat = quota estimate | size=12 color=gray")
-        print(f"calibration: {meta.get('calibration', '?')} | size=12 color=gray")
+        print(f"exact = Claude Code logs · chat = quota estimate | size=11 color={GRAY}")
+        print(f"calibration: {meta.get('calibration', '?')} | size=11 color={GRAY}")
+        if sess.get("chat", 0) < 1 and week.get("chat", 0) < 1:
+            print(f"chat ≈ $0 while Code $ ≥ what the quota % implies — Code-heavy window, "
+                  f"or a mid-week counter reset (weekly realigns at the Monday reset) | size=11 color={GRAY}")
     else:
-        print("chat estimate off — click below to fetch quota | size=12 color=gray")
-    q = meta.get("quota", "none")
-    print(f"quota reading: {q} | size=12 color=gray")
-    print(f"updated {ago(data.get('generated_at'))} | size=12 color=gray")
+        print(f"chat estimate off — click below to fetch quota | size=11 color={GRAY}")
+    stale = (lambda t: t and (datetime.now(timezone.utc) - t).total_seconds() > STALE_MIN * 60)(
+        parse_dt(data.get("generated_at")))
+    upd = f"quota {meta.get('quota', 'none')} · updated {ago(data.get('generated_at'))}"
+    print(f"{upd} | size=11 color={'#ff453b' if stale else GRAY}")
 
-    action("↻ Refresh + chat estimate (fetches quota)", f"{CMD} --write-state --quota")
-    action("↻ Refresh exact only (no network)", f"{CMD} --write-state")
-    print(f"Open state file | href=file://{STATE}")
+    action("Refresh + chat estimate (fetches quota)", f"{CMD} --write-state --quota", sfimage="arrow.clockwise")
+    action("Refresh exact only (no network)", f"{CMD} --write-state", sfimage="arrow.clockwise.circle")
+    print(f"Open claude.ai usage page | href=https://claude.ai/settings/usage sfimage=chart.line.uptrend.xyaxis")
+    print(f"Open state file | href=file://{STATE} sfimage=doc.text")
 
 
 if __name__ == "__main__":

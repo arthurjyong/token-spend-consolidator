@@ -19,3 +19,6 @@ CLAUDE.local.md
 # Everything under gitignored-data/ is yours-only; only the README documenting the layout is tracked.
 gitignored-data/*
 !gitignored-data/README.md
+
+# personal drop zone for fresh exports (filed into gitignored-data/ by sessions)
+inbox/
